@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Registry Monitor</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-up {
+            color: #28a745;
+        }
+        .status-down {
+            color: #dc3545;
+        }
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+        .last-heartbeat {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .refresh-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        .refresh-all-btn {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-server me-2"></i>
+                    Service Registry Monitor
+                </h2>
+                <button id="refreshAllBtn" class="btn btn-light refresh-all-btn">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh All
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Service Name</th>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                                <th>Last Heartbeat</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for service in services %}
+                            <tr>
+                                <td>{{ service.name }}</td>
+                                <td>{{ service.ip }}</td>
+                                <td>
+                                    {% if service.status == 'UP' %}
+                                        <span class="status-up">
+                                            <i class="fas fa-circle"></i> UP
+                                        </span>
+                                    {% else %}
+                                        <span class="status-down">
+                                            <i class="fas fa-circle"></i> DOWN
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="last-heartbeat">
+                                        {{ service.last_heartbeat }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary refresh-btn" 
+                                            onclick="refreshService('{{ service.name }}')">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                <small>Last updated: {{ current_time }}</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh the page every 30 seconds
+        setTimeout(function() {
+            window.location.reload();
+        }, 30000);
+
+        // Function to update a single service row
+        function updateServiceRow(serviceName, status, lastHeartbeat) {
+            const rows = document.querySelectorAll('tbody tr');
+            for (const row of rows) {
+                if (row.cells[0].textContent === serviceName) {
+                    // Update status
+                    const statusCell = row.cells[2];
+                    statusCell.innerHTML = status === 'UP' 
+                        ? '<span class="status-up"><i class="fas fa-circle"></i> UP</span>'
+                        : '<span class="status-down"><i class="fas fa-circle"></i> DOWN</span>';
+                    
+                    // Update last heartbeat
+                    row.cells[3].innerHTML = `<span class="last-heartbeat">${lastHeartbeat}</span>`;
+                    break;
+                }
+            }
+        }
+
+        // Function to refresh a single service
+        function refreshService(serviceName) {
+            fetch(`/refresh/${serviceName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                } else {
+                    updateServiceRow(data.name, data.status, data.last_heartbeat);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Function to refresh all services
+        document.getElementById('refreshAllBtn').addEventListener('click', function() {
+            fetch('/refresh_all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                data.services.forEach(service => {
+                    updateServiceRow(service.name, service.status, service.last_heartbeat);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html> 
